@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Web GL - Сетка</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+    }
+    .container {
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #value {
+      margin-bottom: 16px;
+      font-size: 36px;
+    }
+    input {
+      display: block;
+    }
+    input + input {
+      margin-top: 8px;
+    }
+    svg {
+      margin-top: 16px;
+      border: 2px solid black;
+    }
+    path {
+      stroke: #1B98E0;
+      stroke-width: 2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="value">
+      cubic-bezier
+    </div>
+
+    <div id="inputs-container">
+    </div>
+
+    <svg>
+      <path id="svg-path" />
+    </svg>
+  </div>
+
+  <script>
+    /**
+     * Функция взята отсюда:
+     * https://github.com/arian/cubic-bezier/blob/master/index.js
+     */
+    function bezier(x1, y1, x2, y2, epsilon) {
+
+      var curveX = function(t){
+        var v = 1 - t;
+        return 3 * v * v * t * x1 + 3 * v * t * t * x2 + t * t * t;
+      };
+
+      var curveY = function(t){
+        var v = 1 - t;
+        return 3 * v * v * t * y1 + 3 * v * t * t * y2 + t * t * t;
+      };
+
+      var derivativeCurveX = function(t){
+        var v = 1 - t;
+        return 3 * (2 * (t - 1) * t + v * v) * x1 + 3 * (- t * t * t + 2 * v * t) * x2;
+      };
+
+      return function(t){
+
+        var x = t, t0, t1, t2, x2, d2, i;
+
+        // First try a few iterations of Newton's method -- normally very fast.
+        for (t2 = x, i = 0; i < 8; i++){
+          x2 = curveX(t2) - x;
+          if (Math.abs(x2) < epsilon) return curveY(t2);
+          d2 = derivativeCurveX(t2);
+          if (Math.abs(d2) < 1e-6) break;
+          t2 = t2 - x2 / d2;
+        }
+
+        t0 = 0, t1 = 1, t2 = x;
+
+        if (t2 < t0) return curveY(t0);
+        if (t2 > t1) return curveY(t1);
+
+        // Fallback to the bisection method for reliability.
+        while (t0 < t1){
+          x2 = curveX(t2);
+          if (Math.abs(x2 - x) < epsilon) return curveY(t2);
+          if (x > x2) t0 = t2;
+          else t1 = t2;
+          t2 = (t1 - t0) * .5 + t0;
+        }
+
+        // Failure
+        return curveY(t2);
+
+      };
+
+    }
+
+    // Ширина svg
+    const WIDTH = 400;
+    // Высота svg
+    const HEIGHT = 400;
+
+    /**
+     * Преобразование координат соразмерно к svg
+     */
+    function toScreen(x, y) {
+      return [x * WIDTH, (1 - y) * HEIGHT]
+    }
+
+    // Устанавливаю ширину и высоту
+    const svg = document.querySelector('svg');
+    svg.style.width = `${WIDTH}px`;
+    svg.style.height = `${HEIGHT}px`;
+
+    /**
+     * Калькулятор, который всё просчитывает и визуализирует
+     */
+    const calc = {
+      // Элементы, на которых будет вывод
+      display: document.getElementById('value'),
+      svgPath: document.getElementById('svg-path'),
+
+      // Значения функции bezier
+      values: [0.81, 0.26, 0.22, 0.97],
+
+      // Установка значения из инпута
+      set(index, value) {
+        this.values[index] = +value;
+        this.show();
+      },
+
+      // Вывод
+      show() {
+        // Вывожу текущие значения
+        this.display.innerText = `cubic-bezier(${this.values.join(', ')})`;
+
+        // Функция cubic-bezier
+        const easing = bezier(...this.values, 1 / 1e5);
+
+        const path = [];
+        const steps = 150;
+        for (let i = 0; i < steps; i += 1) {
+          let x = i / steps;
+          const current = toScreen(x, easing(x));
+          
+          x = (i + 1) / steps;
+          const next = toScreen(x, easing(x));
+
+          path.push(`M${current.join(' ')} L${next.join(' ')}`);
+        }
+
+        this.svgPath.setAttribute('d', `${path.join(' ')} Z`);
+      },
+
+      // Инициализация - создание инпутов и первичная отрисовка
+      init() {
+        const inputsContainer = document.getElementById('inputs-container');
+
+        const inputs = this.values.map((val, i) => {
+          const input = document.createElement('input');
+          input.addEventListener('input', () => this.set(i, input.value));
+          input.type = 'range';
+          input.min = 0;
+          input.max = 1;
+          input.step = 0.01;
+          input.value = +val;
+          input.style.width = svg.style.width;
+          inputsContainer.appendChild(input);
+        });
+
+        this.show();
+      },
+    };
+
+    calc.init();
+  </script>
+</body>
+</html>

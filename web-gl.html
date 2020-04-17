@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Web GL - Сетка</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    .container {
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .hint {
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hint">
+      Web GL &mdash; координатная сетка через фрагментный шейдер
+    </div>
+
+    <canvas id="glcanvas">
+    </canvas>
+  </div>
+
+  <script src="https://unpkg.com/three@0.115.0/build/three.js"></script>
+
+  <script type="x-shader/x-fragment" id="fragment-shader">
+    // Координаты осей координат в пространстве окна
+    uniform vec2 axes;
+    // Расстояния между вертикальными и горизонтальными серыми линиями
+    uniform vec2 steps;
+
+    // Цвет серой линии. Каждая пятая будет с двойной яркостью.
+    vec4 stepColor = vec4(0.3, 0.3, 0.3, 1);
+
+    /**
+    * Является ли координата координатой оси
+    *
+    * axesCoord - координата оси
+    * coord - координата для проверки
+    */
+    bool isAxesCoord(float axesCoord, float coord) {
+      return(abs(axesCoord - coord) < 1.5);
+    }
+
+    /**
+    * Является ли координата координатой серой полоски.
+    * Может быть 0 (не на серой полоске), 1 (серая полоска) и 2 (ярко-серая полоска).
+    *
+    * step - расстояние между полосками
+    * axesCoord - координата оси
+    * coord - координата для проверки
+    */
+    float stepCoordValue(float step, float axesCoord, float coord) {
+      // Расстояние от оси до координаты
+      float dist = abs(coord - axesCoord);
+
+      // Если расстояние больше 0.9 от ближайшей серой линии, то мимо 
+      if (mod(dist, step) > float(0.9))
+        return 0.0;
+
+      // Если серая линия - "каждая пятая", то ярко
+      if (mod(floor(dist / step), 5.0) == float(0))
+        return 2.0;
+      
+      // Иначе обычная серая линия
+      return 1.0;
+    }
+
+    void main() {
+      if (isAxesCoord(gl_FragCoord.x, axes.x))
+        // На оси Y - красный
+        gl_FragColor = vec4(1, 0, 0, 1);
+      else if (isAxesCoord(gl_FragCoord.y, axes.y))
+        // На оси X - зелёный
+        gl_FragColor = vec4(0, 1, 0, 1);
+      else {
+        float stepValue = stepCoordValue(steps.x, axes.x, gl_FragCoord.x);
+        if (stepValue > 0.0)
+          // Серая вертикальная полоска
+          gl_FragColor = stepColor * stepValue;
+        else {
+          stepValue = stepCoordValue(steps.y, axes.y, gl_FragCoord.y);
+          if (stepValue > 0.0)
+            // Серая горизонтальная полоска
+            gl_FragColor = stepColor * stepValue;
+          else
+            // Чёрный цвет
+            gl_FragColor = vec4(0, 0, 0, 0);
+        }
+      }
+    }
+  </script>
+
+  <script>
+    // Ширина канваса
+    const WIDTH = 600;
+
+    // Высота канваса
+    const HEIGHT = 600;
+
+    // Расстояние между серыми линиями
+    const STEP = 20;
+
+    const canvas = document.getElementById('glcanvas');
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    // Создаю сцену, камеру и визуализатор
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, WIDTH / HEIGHT, 0.1, 1000);
+    camera.position.set(0, 0, 1);
+    camera.lookAt(0, 0, 0);
+    const renderer = new THREE.WebGLRenderer({ canvas });
+    renderer.setSize(WIDTH, HEIGHT);
+
+    // Плоская геометрия и достаточно большая, чтобы занимать весь экран
+    const geometry = new THREE.PlaneGeometry(5, 5);
+
+    // Материал, который будет использовать шейдер для отрисовки
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        axes: { value: new THREE.Vector2(~~(WIDTH / 2), ~~(HEIGHT / 2)) },
+        steps: { value: new THREE.Vector2(STEP, STEP) },
+      },
+      fragmentShader: document.getElementById('fragment-shader').innerText,
+    });
+
+    // Добавляю объект на сцену
+    const plane = new THREE.Mesh(geometry, material);
+    scene.add(plane);
+
+    // Рисую
+    renderer.render(scene, camera);
+  </script>
+</body>
+</html>
