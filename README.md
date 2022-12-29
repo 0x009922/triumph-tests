@@ -1,6 +1,6 @@
 # Тестовые задания
 
-Просмотреть можно по этой ссылке: https://liquidsolid.github.io/triumph-tests/index.html
+Просмотреть можно по этой ссылке: https://0x009922.github.io/triumph-tests/index.html
 
 ## JS
 
